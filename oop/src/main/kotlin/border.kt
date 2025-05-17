@@ -3,9 +3,9 @@ package org.example
 data class Border(
     var name: String,
     var ingredients: MutableList<Ingredient>,
-    var allowed: MutableList<String> = mutableListOf<String>(),
-    var banned: MutableList<String> = mutableListOf<String>()
-){
+    var allowed: MutableList<String> = mutableListOf(),
+    var banned: MutableList<String> = mutableListOf()
+) {
     private val BASE_COST = 20.0
     override fun toString() = "$name = ${borderPrice()}"
 
@@ -15,7 +15,7 @@ data class Border(
         else return true
     }
 
-    fun borderPrice() : Double{
+    fun borderPrice() : Double {
         return ingredients.sumOf { it.price } + BASE_COST
     }
 }
@@ -33,7 +33,8 @@ class ManageBorders(private val ingredients: List<Ingredient>) : baseFunction {
                 2. Удалить бортик
                 3. Изменить бортик
                 4. Показать все бортики
-                5. Назад
+                5. Сортировка
+                6. Назад
                 """.trimIndent()
             )
             val input = readLine()
@@ -42,9 +43,71 @@ class ManageBorders(private val ingredients: List<Ingredient>) : baseFunction {
                 "2" -> del()
                 "3" -> edit()
                 "4" -> show()
-                "5" -> contin = false
+                "5" -> sort()
+                "6" -> contin = false
                 else -> println("Введите корректное число!")
             }
+        }
+    }
+
+    override fun sort() {
+        if (allBorders.isEmpty()) {
+            println("Пусто!")
+            return
+        }
+        println("""
+            === Сортировка ===
+            1. По названию (А-Я)
+            2. По названию (Я-А)
+            3. По цене (возрастание)
+            4. По цене (убывание)
+            5. Фильтровать по цене (интревал)
+            6. Фильтровать по ингредиенту
+            7. Назад
+        """.trimIndent())
+
+        when(readln()) {
+            "1" -> {
+                allBorders.sortWith(borderByNameAsc)
+                println("Отсортировано по названию (А-Я)")
+                show()
+            }
+            "2" -> {
+                allBorders.sortWith(borderByNameDesc)
+                println("Отсортировано по названию (Я-А)")
+                show()
+            }
+            "3" -> {
+                allBorders.sortWith(borderByPriceAsc)
+                println("Отсортировано по цене (возрастание)")
+                show()
+            }
+            "4" -> {
+                allBorders.sortWith(borderByPriceDesc)
+                println("Отсортировано по цене (убывание)")
+                show()
+            }
+            "5" -> {
+                println("Минимальная цена (enter для пропуска)")
+                val minPrice = checkPrice()
+                println("Максимальная цена (enter для пропуска)")
+                val maxPrice = checkPrice()
+
+                val filteredBases = filterByPriceRange( minPrice, maxPrice)
+                showFiltered(filteredBases)
+            }
+            "6" -> {
+                println("Выберите ингредиент для фильтрации:")
+                ingredients.forEachIndexed { i, ingr -> println("${i + 1}: $ingr") }
+                println("${ingredients.size + 1}: Назад")
+                val indIngr = checkIndex(ingredients)
+                if (indIngr == ingredients.size + 1) return
+
+                val filteredBorders = filterByIngredient(ingredients[indIngr - 1])
+                showFiltered(filteredBorders)
+            }
+            "7" -> return
+            else -> println("Некорректный выбор!")
         }
     }
 
@@ -55,10 +118,11 @@ class ManageBorders(private val ingredients: List<Ingredient>) : baseFunction {
         val selectedIngredients = mutableListOf<Ingredient>()
         while(true) {
             println("Выберите ингредиенты для бортика:")
-            ingredients.forEachIndexed { i, ingredient -> println("${i + 1}: $ingredient") }
+            val sortedIngredients = ingredients.sortedWith(compareBy { it.price })
+            sortedIngredients.forEachIndexed { i, ingredient -> println("${i + 1}: $ingredient") }
             println("${ingredients.size + 1}: Готово")
 
-            var ingrBorder = checkIndex(ingredients)
+            val ingrBorder = checkIndex(ingredients)
             if(ingrBorder == ingredients.size + 1) break
 
             selectedIngredients.add(ingredients[ingrBorder - 1])
@@ -77,16 +141,14 @@ class ManageBorders(private val ingredients: List<Ingredient>) : baseFunction {
                 allowed.add(check)
             }
         }
-        else{
-            println("Добавить пиццы, с которыми нельзя использовать данный бортик? (да или нет)")
-            check = readln()
-            if (check.lowercase() == "да"){
-                println("Вводите название пиццы одно на строку, если всё внесли, то нажмите enter!")
-                while(true){
-                    check = readln()
-                    if (check.isBlank()) break
-                    banned.add(check)
-                }
+        println("Добавить пиццы, с которыми нельзя использовать данный бортик? (да или нет)")
+        check = readln()
+        if (check.lowercase() == "да"){
+            println("Вводите название пиццы одно на строку, если всё внесли, то нажмите enter!")
+            while(true){
+                check = readln()
+                if (check.isBlank()) break
+                banned.add(check)
             }
         }
         allBorders.add(Border(name, selectedIngredients, allowed, banned))
@@ -175,10 +237,42 @@ class ManageBorders(private val ingredients: List<Ingredient>) : baseFunction {
     }
 
     override fun show() {
-        if(allBorders.isEmpty()) return println("Пусто!")
-        allBorders.forEachIndexed { i, border -> println("${i + 1}: $border") }
+        if(allBorders.isEmpty()) {
+            println("Пусто!")
+            return
+        }
+        allBorders.forEachIndexed { i, border -> println("${i + 1} : $border") }
         println("${allBorders.size + 1}: Назад!")
     }
+
+    fun filterByPriceRange(minPrice: Double = 0.0, maxPrice: Double = 10000000.0): List<Border> {
+        return allBorders.filter { border ->
+            val price = border.borderPrice()
+            price in minPrice..maxPrice
+        }
+    }
+
+    fun filterByIngredient(ingredient: Ingredient): List<Border> {
+        return allBorders.filter { border ->
+            border.ingredients.any { it.name.lowercase() == ingredient.name.lowercase() }
+        }
+    }
+
+
+
+
+    fun showFiltered(borders: List<Border>) {
+        if (borders.isEmpty()) {
+            println("Ничего не найдено!")
+            return
+        }
+        val sortedBases = borders.sortedWith(borderByPriceAsc)
+        sortedBases.forEachIndexed { i, border ->
+            println("Пицца №${i + 1}")
+            border.toString()
+        }
+    }
+
 
     fun get(): List<Border> = allBorders
 }

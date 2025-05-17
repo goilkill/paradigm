@@ -1,35 +1,40 @@
 package org.example
 
-data class Pizza(
-    var name: String,
-    var base: Base,
-    var size: PizzaSize,
-    var border: Border?,
-    var ingredients: MutableList<Ingredient>
+open class Pizza(
+    open var name: String,
+    open var base: Base?,
+    open var size: PizzaSize,
+    open var border: Border?,
+    open var ingredients: MutableList<Ingredient>
 ) {
-    fun finalPrice(): Double {
-        var ingrPrice = ingredients.sumOf { it.price }
-        if (border != null) ingrPrice += border!!.borderPrice()
-        if (size == PizzaSize.SMALL) ingrPrice += 50.0
-        else if(size == PizzaSize.MEDIUM) ingrPrice += 100.0
-        else ingrPrice += 150.0
-        return base.price + ingrPrice
+    open fun finalPrice(): Double {
+        var price = ingredients.sumOf { it.price }
+        if (border != null) price += border!!.borderPrice()
+        when (size) {
+            PizzaSize.SMALL -> price += 50.0
+            PizzaSize.MEDIUM -> price += 100.0
+            PizzaSize.LARGE -> price += 150.0
+        }
+        if (base != null) price += base!!.price
+        return price
     }
 
-    override fun toString() = """
-        Название: $name 
-        Основа: $base 
-        Ингредиенты: ${ingredients.joinToString()}
-        Бортик: $border
-        Размер: $size
-        Сумма пиццы: ${finalPrice()}
-    """.trimIndent()
+    open fun Print() {
+        println("""
+            Название: $name 
+            Основа: $base 
+            Ингредиенты: ${ingredients.joinToString()}
+            Бортик: $border
+            Размер: $size
+            Сумма пиццы: ${finalPrice()}
+        """.trimIndent())
+    }
 }
 
 class ManagePizza(private val ingredientsList: List<Ingredient>, private val basesList: List<Base>, private val borderList: List<Border>) : baseFunction {
     private var allPizzas = mutableListOf<Pizza>()
 
-    fun menu(){
+    fun menu() {
         var contin = true
         while (contin) {
             println(
@@ -38,17 +43,19 @@ class ManagePizza(private val ingredientsList: List<Ingredient>, private val bas
                 1. Добавить пиццу
                 2. Удалить пиццу
                 3. Изменить пиццу
-                4. Показать все пиццы
-                5. Назад
+                4. Фильтрация
+                5. Показать все пиццы
+                6. Назад
                 """.trimIndent()
             )
             val input = readLine()
-            when(input){
+            when (input) {
                 "1" -> add()
                 "2" -> del()
                 "3" -> edit()
-                "4" -> show()
-                "5" -> contin = false
+                "4" -> sort()
+                "5" -> show()
+                "6" -> contin = false
                 else -> println("Введите корректное число!")
             }
         }
@@ -58,60 +65,68 @@ class ManagePizza(private val ingredientsList: List<Ingredient>, private val bas
     override fun add() {
         println("Введите название пиццы!")
         val name = checkName()
-        if (allPizzas.find { it.name.lowercase() == name.lowercase()} != null) {
+        if (allPizzas.find { it.name.lowercase() == name.lowercase() } != null) {
             println("Такая пицца уже есть!")
             return
         }
 
         println("Выберите основу:")
-        basesList.forEachIndexed { i, base -> println("${i + 1}: $base.") }
+        val sortedBases = basesList.sortedWith(compareBy { it.price })
+        sortedBases.forEachIndexed { i, base -> println("${i + 1}: $base.") }
         val baseInd = checkIndex(basesList)
 
         println("Выберите размер:")
         PizzaSize.values().forEachIndexed { i, pizzaSize -> println("${i + 1}: $pizzaSize") }
-        var ind = checkIndex(PizzaSize.values().toList())
+        val ind = checkIndex(PizzaSize.values().toList())
         val size = PizzaSize.values()[ind - 1]
 
         var border: Border? = null;
-        if(borderList.isEmpty()) println("Бортиков нет!")
+        if (borderList.isEmpty()) println("Бортиков нет!")
         else {
             println("Выберите бортик!")
-            borderList.forEachIndexed { i, border -> println("${i + 1}: $border") }
+            val sortedBorders = borderList.sortedWith(borderByPriceAsc)
+            sortedBorders.forEachIndexed { i, border -> println("${i + 1}: $border") }
             println("${borderList.size + 1}: Пропустить")
-            ind = checkIndex(borderList)
-            if (ind != borderList.size + 1) border = borderList[ind - 1]
+            val borderInd = checkIndex(borderList)
+            if (borderInd != borderList.size + 1) {
+                if (borderList[borderInd - 1].checkPizza(name)) border = borderList[borderInd - 1]
+                else println("Нельзя совмещать этот бортик с этой пиццей")
+            }
         }
-
 
         val ingredientOnPizza = mutableListOf<Ingredient>()
         while (true) {
             println("Выбери ингредиент, который хотите добавить!")
-            ingredientsList.forEachIndexed { i, ingredient -> println("${i + 1}: $ingredient.") }
+            val sortedIngredients = ingredientsList.sortedWith(compareBy { it.price })
+            sortedIngredients.forEachIndexed { i, ingredient -> println("${i + 1}: $ingredient.") }
             println("${ingredientsList.size + 1}: Закончить")
 
             val ingrInd = checkIndex(ingredientsList)
-            if(ingrInd == ingredientsList.size + 1) break
+            if (ingrInd == ingredientsList.size + 1) break
 
             ingredientOnPizza.add(ingredientsList[ingrInd - 1])
-
         }
-        allPizzas.add(Pizza(name,basesList[baseInd - 1], size, border, ingredientOnPizza))
+        allPizzas.add(Pizza(name, basesList[baseInd - 1], size, border, ingredientOnPizza))
         println("Пицца успешно добавлена!")
     }
 
+
+
     override fun del() {
-        if(allPizzas.isEmpty()) return println("Пусто!")
+        if (allPizzas.isEmpty()) return println("Пусто!")
         show()
 
         println("Введите номер пиццы!")
         val pizzaInd = checkIndex(allPizzas)
-        if(pizzaInd == allPizzas.size + 1) return
+        if (pizzaInd == allPizzas.size + 1) return
         allPizzas.removeAt(pizzaInd - 1)
         println("Успешно удалено!")
     }
 
+
+
     override fun edit() {
-        if(allPizzas.isEmpty()) {
+        if (allPizzas.isEmpty()) {
             println("Пусто!")
             return
         }
@@ -121,17 +136,23 @@ class ManagePizza(private val ingredientsList: List<Ingredient>, private val bas
         val pizzaInd = checkIndex(allPizzas)
         if (pizzaInd == allPizzas.size + 1) return
         val curPizza = allPizzas[pizzaInd - 1]
-        while(true) {
+        editRegularPizza(curPizza)
+
+        println("Изменения прошли успешно!")
+    }
+
+    private fun editRegularPizza(curPizza: Pizza) {
+        while (true) {
             println(
                 """
-                        Что меняем? Выберите цифру
-                            1. Название
-                            2. Основа
-                            3. Размер
-                            4. Бортик
-                            5. Ингредиенты
-                            6. Назад
-                    """.trimIndent()
+                    Что меняем? Выберите цифру
+                        1. Название
+                        2. Основа
+                        3. Размер
+                        4. Бортик
+                        5. Ингредиенты
+                        6. Назад
+                """.trimIndent()
             )
             val input = readln()
             when (input) {
@@ -171,7 +192,10 @@ class ManagePizza(private val ingredientsList: List<Ingredient>, private val bas
                         println("${borderList.size + 2}: Не изменять")
                         val borderInd = checkIndex(borderList)
                         if (borderInd == borderList.size + 1) curPizza.border = null
-                        else if (borderInd != borderList.size + 2) curPizza.border = borderList[borderInd - 1]
+                        else if (borderInd != borderList.size + 2) {
+                            if (borderList[borderInd - 1].checkPizza(curPizza.name)) curPizza.border = borderList[borderInd - 1]
+                            else println("Нельзя совмещать этот бортик с этой пиццей")
+                        }
                     }
                 }
 
@@ -199,66 +223,98 @@ class ManagePizza(private val ingredientsList: List<Ingredient>, private val bas
                 "6" -> break
             }
         }
-        println("Изменения прошли успешно!")
     }
 
     override fun show() {
-        if(allPizzas.isEmpty()) return println("Пусто!")
-        allPizzas.forEachIndexed { i, pizza -> {
-            println("Пицца №${i + 1}")
-            println(pizza)
-        } }
+        if (allPizzas.isEmpty()) return println("Пусто!")
+        allPizzas.forEachIndexed { i, pizza ->
+            println("======== Пицца №${i + 1} ========")
+            pizza.Print()
+        }
         println("${allPizzas.size + 1}: Назад!")
     }
+
 
     fun get() = allPizzas
 
 
 
-    fun filter(){
-        println("""
-            === Фильтруем ===
-            1. По ингредиентам
-            2. По цене
-            3. По размеру
-            4. Назад
-        """.trimIndent())
-        val input = readln()
-        when (input) {
-            "1" ->{
-                println("Выберите номер ингредиента, по которому фильтруем:")
+
+    override fun sort() {
+        if (allPizzas.isEmpty()) return println("Пусто!")
+        println(
+            """
+            === Сортировка и фильтрация ===
+            1. Сортировать по названию (А-Я)
+            2. Сортировать по названию (Я-А)
+            3. Сортировать по цене (возрастание)
+            4. Сортировать по цене (убывание)
+            5. Фильтровать по ингредиенту
+            6. Фильтровать по цене
+            7. Фильтровать по размеру
+            8. Назад
+        """.trimIndent()
+        )
+
+        when (readln()) {
+            "1" -> {
+                allPizzas.sortWith(pizzaByNameAsc)
+                println("Отсортировано по названию (А-Я)")
+                show()
+            }
+
+            "2" -> {
+                allPizzas.sortWith(pizzaByNameDesc)
+                println("Отсортировано по названию (Я-А)")
+                show()
+            }
+
+            "3" -> {
+                allPizzas.sortWith(pizzaByPriceAsc)
+                println("Отсортировано по цене (возрастание)")
+                show()
+            }
+
+            "4" -> {
+                allPizzas.sortWith(pizzaByPriceDesc)
+                println("Отсортировано по цене (убывание)")
+                show()
+            }
+
+            "5" -> {
+                println("Выберите ингредиент для фильтрации:")
                 ingredientsList.forEachIndexed { i, ingr -> println("${i + 1}: $ingr") }
                 println("${ingredientsList.size + 1}: Назад")
                 val indIngr = checkIndex(ingredientsList)
                 if (indIngr == ingredientsList.size + 1) return
-                val listPizzas = filterByIngredient(ingredientsList[indIngr - 1])
-                showFilteredPizzas(listPizzas)
+                
+                val filteredPizzas = filterByIngredient(ingredientsList[indIngr - 1])
+                showFiltered(filteredPizzas)
             }
-            "2"->{
-                println("Минимальная цена(если минимальный порог не нужен, то нажмите enter)")
+
+            "6" -> {
+                println("Минимальная цена (enter для пропуска)")
                 val minPrice = checkPrice()
-                println("Максимальная цена(если максимальный порог не нужен, то нажмите enter)")
+                println("Максимальная цена (enter для пропуска)")
                 val maxPrice = checkPrice()
-                val listPizzas = filterByPriceRange(minPrice, maxPrice)
-                println("=== Список заказов ===")
-                showFilteredPizzas(listPizzas)
+                
+                val filteredPizzas = filterByPriceRange(minPrice, maxPrice)
+                showFiltered(filteredPizzas)
             }
-            "3"->{
-                println("Выберите номер размера, по которому фильтруем:")
+
+            "7" -> {
+                println("Выберите размер для фильтрации:")
                 PizzaSize.values().forEachIndexed { i, size -> println("${i + 1}: $size")}
-                println("${ingredientsList.size + 1}: Назад")
+                println("${PizzaSize.values().size + 1}: Назад")
                 val indSize = checkIndex(PizzaSize.values().toList())
                 if (indSize == PizzaSize.values().size + 1) return
-                val listPizzas = filterBySize(PizzaSize.values()[indSize - 1])
-                showFilteredPizzas(listPizzas)
+                
+                val filteredPizzas = filterBySize(PizzaSize.values()[indSize - 1])
+                showFiltered(filteredPizzas)
             }
-            "4"-> return
-        }
-    }
 
-    private fun filterByIngredient(ingredient: Ingredient): List<Pizza> {
-        return allPizzas.filter { pizza ->
-            pizza.ingredients.any { it.name.lowercase() == ingredient.name.lowercase() }
+            "8" -> return
+            else -> println("Некорректный выбор!")
         }
     }
 
@@ -269,18 +325,29 @@ class ManagePizza(private val ingredientsList: List<Ingredient>, private val bas
         }
     }
 
-    private fun filterBySize(size: PizzaSize): List<Pizza> {
+    private fun showFiltered(list: List<Pizza>) {
+        if (allPizzas.isEmpty()) {
+            println("Ничего не найдено!")
+            return
+        }
+        val sortedPizzas = allPizzas.sortedWith(pizzaByPriceAsc)
+        sortedPizzas.forEachIndexed { i, pizza ->
+            println("Пицца №${i + 1}")
+            pizza.Print()
+        }
+    }
+
+    private fun filterByIngredient(ingredient: Ingredient): List<Pizza> {
+        return allPizzas.filter { pizza ->
+            pizza.ingredients.any { it.name.lowercase() == ingredient.name.lowercase() }
+        }
+    }
+
+    fun filterBySize(size: PizzaSize): List<Pizza> {
         return allPizzas.filter { it.size == size }
     }
 
-    private fun showFilteredPizzas(listPizzas:List<Pizza>){
-        if(listPizzas.isEmpty()) {
-            println("Список пуст!")
-            return
-        }
-        listPizzas.forEachIndexed { i, pizza -> {
-            println("Пицца №${i + 1}")
-            println(pizza)
-        } }
-    }
 }
+
+
+

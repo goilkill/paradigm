@@ -7,7 +7,6 @@ class Manage {
     private val pizza = ManagePizza(ingredients.get(), bases.get(), borders.get())
     private val orders = ManageOrders(pizza.get(), ingredients.get(), bases.get(), borders.get())
 
-
     fun menu(){
         var contin = true
         while (contin) {

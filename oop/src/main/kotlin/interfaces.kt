@@ -5,4 +5,5 @@ interface baseFunction {
     fun del()
     fun edit()
     fun show()
+    fun sort()
 }
