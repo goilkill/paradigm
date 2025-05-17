@@ -136,12 +136,12 @@ class ManagePizza(private val ingredientsList: List<Ingredient>, private val bas
         val pizzaInd = checkIndex(allPizzas)
         if (pizzaInd == allPizzas.size + 1) return
         val curPizza = allPizzas[pizzaInd - 1]
-        editRegularPizza(curPizza)
+        editPizza(curPizza)
 
         println("Изменения прошли успешно!")
     }
 
-    private fun editRegularPizza(curPizza: Pizza) {
+    private fun editPizza(curPizza: Pizza) {
         while (true) {
             println(
                 """
